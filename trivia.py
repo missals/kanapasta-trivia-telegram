@@ -1,4 +1,4 @@
-import sys
+import configparser
 
 from time import sleep
 
@@ -8,16 +8,19 @@ from question import *
 
 # TODO: Logging
 
+config = configparser.ConfigParser()
+config.read('config/trivia.ini')
+
 
 class Trivia:
 
     def __init__(self):
 
-        self.updater = Updater(token='')
+        self.updater = Updater(token=config['DEFAULT']['bot_token'])
         self.bot = self.updater.bot
         self.dispatcher = self.updater.dispatcher
         self.job_queue = self.updater.job_queue
-        self.chat_id = ''
+        self.chat_id = config['DEFAULT']['trivia_chat']
         self.current_answer = None
         self.correct = False
         self.active = False
@@ -98,7 +101,7 @@ class Trivia:
                                    url_path='TOKEN',
                                    key='server.key',
                                    cert='server.pem',
-                                   webhook_url='')
+                                   webhook_url=config['DEFAULT']['webhook_address'])
 
     def ask_question(self):
         q = Question()
