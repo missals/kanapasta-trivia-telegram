@@ -1,10 +1,7 @@
+from peewee import fn
 from random import randint
 
-questions = [
-            [1, "1 + 1?", "2"],
-            [2, "100 - 6?", "94"],
-            [3, "3 * 12?", "36"]
-            ]
+from db import Question as Question_db
 
 
 class Question:
@@ -25,23 +22,15 @@ class Question:
 
             q = self.random_question()
 
-            self.question['qid'] = q[0]
-            self.question['question'] = q[1]
-            self.question['answer'] = q[2]
-
+            self.question['qid'] = q.id
+            self.question['question'] = q.question
+            self.question['answer'] = q.answer
             self.question['hints'] = self.generate_hints(self.question['answer'], self.num_hints)
-
-            print(self.question)
-
-        else:
-            print(self.question)
-
 
     @staticmethod
     def random_question():
 
-        qid = randint(0, len(questions) - 1)
-        q = questions[qid]
+        q = Question_db.select().where(Question_db.active).order_by(fn.Rand()).limit(1).get()
 
         return q
 
@@ -61,16 +50,68 @@ class Question:
                 h.append('*' + a[1])
             else:
                 h.append(a[0] + '*')
+
             return h
+
+        elif 3 <= l <= 5:
+            hints = list()
+            hint = list()
+
+            for i in range(l):
+                if a[i] != ' ':
+                    hint.append('*')
+                else:
+                    hint.append(' ')
+
+            hints.append("".join(hint))
+
+            hint = list()
+
+            for i in range(l):
+                if (randint(0, 2) == 0) or a[i] == ' ':
+                    hint.append(a[i])
+                else:
+                    hint.append('*')
+
+            hints.append("".join(hint))
+
+            return hints
+
         else:
-            disguised = '*' * l
-            h = []
-            i = 0
-            while i < 3:
-                h_temp = list(disguised)
-                for j in h_temp:
-                    if randint(0, 1) == 0:
-                        h_temp[j] = answer[j]
-                    h.append(h_temp)
-                i += 1
-            return h
+            hints = list()
+
+            hint = list()
+
+            for i in range(l):
+                if a[i] != ' ':
+                    hint.append('*')
+                else:
+                    hint.append(' ')
+
+            hints.append("".join(hint))
+
+            hint = list()
+
+            for i in range(l):
+                if (randint(0, 1) == 0) or a[i] == ' ':
+                    hint.append(a[i])
+                else:
+                    hint.append('*')
+
+            hints.append("".join(hint))
+
+            hint_comp = hint
+            hint = list()
+
+            for i in range(l):
+                if (randint(0, 1) == 0) or a[i] == ' ' or hint_comp[i] != '*':
+                    hint.append(a[i])
+                else:
+                    hint.append('*')
+
+            hints.append("".join(hint))
+
+            return hints
+
+Question()
+

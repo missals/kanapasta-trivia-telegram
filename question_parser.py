@@ -1,6 +1,6 @@
 import os
 
-from config.db import db, Question
+from db import db, Question
 
 DIRECTORY = 'raw_questions/'
 

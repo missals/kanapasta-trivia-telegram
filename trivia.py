@@ -72,7 +72,6 @@ class Trivia:
     def create_answer_handler(self):
 
         def answer(bot, update):
-            print("Evaluating answer...")
             if self.current_answer:
                 message = update.message.text
 
@@ -80,7 +79,7 @@ class Trivia:
                     self.correct = True
 
                     # TODO: Implement proper method to save stats etc. with the player. Some highlights from the round?
-                    bot.sendMessage(chat_id=update.message.chat_id, text="Correct!")
+                    bot.sendMessage(chat_id=update.message.chat_id, text=str(update.message.from_user['username']) + " got it!")
 
         answer_handler = MessageHandler(Filters.text, answer)
         self.dispatcher.add_handler(answer_handler)
