@@ -75,7 +75,7 @@ class Trivia:
             if self.current_answer:
                 message = update.message.text
 
-                if message.lower() == self.current_answer.lower():
+                if (message.lower() == self.current_answer.lower()) and (not self.correct):
                     self.correct = True
 
                     # TODO: Implement proper method to save stats etc. with the player. Some highlights from the round?
@@ -109,16 +109,18 @@ class Trivia:
         self.bot.sendMessage(chat_id=self.chat_id, text="Question #" +
                                                         str(q.question['qid']) +
                                                         ": " + q.question['question'])
-        sleep(5)
+        sleep(10)
 
         for hint in q.question['hints']:
             if not self.correct:
                 self.bot.sendMessage(chat_id=self.chat_id, text="Hint: " + hint)
-                sleep(10)
+                sleep(20)
 
         if not self.correct:
             self.bot.sendMessage(chat_id=self.chat_id, text="No-one got it! The correct answer was " +
                                                             q.question['answer'])
+
+        sleep(10)
 
         self.correct = False
         self.current_answer = None

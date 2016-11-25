@@ -34,6 +34,6 @@ print(j)
 
 # Save questions to db
 with db.atomic():
-    for idx in range(0, len(questions), 100):
-        Question.insert_many(questions[idx:idx+100]).execute()
-        print("Saved 100 rows!")
+    for idx in range(0, len(questions), 1000):
+        Question.insert_many(questions[idx:idx+1000]).execute()
+        print("Saved 1000 rows!")

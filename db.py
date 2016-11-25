@@ -25,7 +25,8 @@ class MySQLModel(Model):
 
 
 class Player(MySQLModel):
-    id = IntegerField(primary_key=True, unique=True)
+    id = PrimaryKeyField(unique=True)
+    tg_id = IntegerField(unique=True)
     created = DateTimeField(default=datetime.datetime.now)
     questions_attempted = IntegerField(default=0)
     questions_correct = IntegerField(default=0)
@@ -42,18 +43,23 @@ class Question(MySQLModel):
     active = BooleanField(default=True)
 
 
+class QuestionHistory(MySQLModel):
+    id = PrimaryKeyField(unique=True)
+    question = ForeignKeyField(Question, related_name='questions')
+    hint_1 = CharField(null=True)
+    hint_2 = CharField(null=True)
+    hint_3 = CharField(null=True)
+    created = DateTimeField(default=datetime.datetime.now)
+    score_change = IntegerField(null=True)
+
+
 class Event(MySQLModel):
     id = PrimaryKeyField(unique=True)
-    player = ForeignKeyField(Player, related_name='events')
-    question = ForeignKeyField(Question, related_name='questions')
-    created = DateTimeField(default=datetime.datetime.now)
-    description = CharField()
-    score_change = IntegerField()
-
-    class Meta:
-        indexes = (
-            (('player', 'created'), False),
-        )
+    player = ForeignKeyField(Player, related_name='players')
+    question = ForeignKeyField(QuestionHistory, related_name='answered_questions')
+    description = CharField(null=True)
+    attempts = IntegerField(null=True)
+    score_change = IntegerField(null=True)
 
 
 def test_values():
@@ -73,14 +79,8 @@ def test_values():
             print("Created new player at " + str(p.created))
 
 
-# Connect to our database.
-# db.connect()
-
 # Create the tables.
-# db.create_tables([Player, Event, Question], safe=True)
+# db.create_tables([Player, Event, Question, QuestionHistory], safe=True)
 
 # Run test values
 # test_values()
-
-# Close connection.
-# db.close()
