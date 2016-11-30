@@ -1,10 +1,13 @@
 import configparser
 
 from time import sleep
+from datetime import datetime
 
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, Job
 
 from question import *
+from player import *
+from db import db, QuestionHistory, Round
 
 # TODO: Logging
 
@@ -21,9 +24,12 @@ class Trivia:
         self.dispatcher = self.updater.dispatcher
         self.job_queue = self.updater.job_queue
         self.chat_id = config['DEFAULT']['trivia_chat']
-        self.current_answer = None
-        self.correct = False
         self.active = False
+        self.question = None
+        self.current_answer = None
+        self.points = None
+        self.correct = False
+        self.round = None
 
         self.start_webhook()
         self.bot.sendMessage(chat_id=self.chat_id, text="Trivia instance ready.")
@@ -35,6 +41,10 @@ class Trivia:
             if self.active:
                 bot.sendMessage(chat_id=update.message.chat_id, text="Trivia is already running!")
             else:
+                self.round = Round()
+                db.connect()
+                self.round.save()
+                db.close()
                 bot.sendMessage(chat_id=update.message.chat_id, text="Trivia will start in ...")
 
                 sleep(1)
@@ -61,6 +71,10 @@ class Trivia:
         def stop(bot, update):
 
             if self.active:
+                self.round.ended = datetime.now()
+                db.connect()
+                self.round.save()
+                db.close()
                 bot.sendMessage(chat_id=update.message.chat_id, text="Trivia will end after this round.")
                 self.active = False
             else:
@@ -78,8 +92,22 @@ class Trivia:
                 if (message.lower() == self.current_answer.lower()) and (not self.correct):
                     self.correct = True
 
-                    # TODO: Implement proper method to save stats etc. with the player. Some highlights from the round?
-                    bot.sendMessage(chat_id=update.message.chat_id, text=str(update.message.from_user['username']) + " got it!")
+                    p = Player(update.message.from_user, bot, self.chat_id)
+
+                    p.player.total_score += self.points
+                    self.question.winner = p.player
+                    self.question.score_change = self.points
+
+                    db.connect()
+                    p.player.save()
+                    self.question.save()
+                    db.close()
+
+                    bot.sendMessage(chat_id=update.message.chat_id,
+                                    text=p.get_player_name() + " got it! "
+                                    + str(self.points) + " points have been added.")
+
+                    # Some highlights from the round?
 
         answer_handler = MessageHandler(Filters.text, answer)
         self.dispatcher.add_handler(answer_handler)
@@ -104,26 +132,52 @@ class Trivia:
 
     def ask_question(self):
         q = Question()
+
+        qh = QuestionHistory()
+        qh.question = q.question_db
+
+        self.question = qh
+
+        i = 1
+
+        for hint in q.question['hints']:
+            if i == 1:
+                qh.hint_1 = hint
+            elif i == 2:
+                qh.hint_2 = hint
+            elif i == 3:
+                qh.hint_3 = hint
+            i += 1
+
+        # Store created question to history
+        db.connect()
+        qh.save()
+        db.close()
+
+        self.correct = False
+        self.points = 10
         self.current_answer = q.question['answer']
 
         self.bot.sendMessage(chat_id=self.chat_id, text="Question #" +
                                                         str(q.question['qid']) +
-                                                        ": " + q.question['question'])
+                                                        " :: " + q.question['question'] + " :: "
+                                                        + str(self.points) + " points")
         sleep(10)
 
         for hint in q.question['hints']:
             if not self.correct:
-                self.bot.sendMessage(chat_id=self.chat_id, text="Hint: " + hint)
+                self.points -= 2
+                self.bot.sendMessage(chat_id=self.chat_id, text="Hint :: " + hint + " :: "
+                                                                + str(self.points) + " points")
                 sleep(20)
 
         if not self.correct:
+            self.current_answer = None
+            self.correct = False
             self.bot.sendMessage(chat_id=self.chat_id, text="No-one got it! The correct answer was " +
                                                             q.question['answer'])
 
         sleep(10)
-
-        self.correct = False
-        self.current_answer = None
 
     def play(self):
 

@@ -1,15 +1,15 @@
 from peewee import fn
 from random import randint
 
-from db import Question as Question_db
+from db import db, Question as Question_db
 
 
 class Question:
 
-    def __init__(self, question_type=None, num_hints=3):
+    def __init__(self, question_type=None):
 
         self.question_type = question_type
-        self.num_hints = num_hints
+        self.question_db = None
 
         self.question = {
             'qid': None,
@@ -22,20 +22,23 @@ class Question:
 
             q = self.random_question()
 
+            self.question_db = q
             self.question['qid'] = q.id
             self.question['question'] = q.question
             self.question['answer'] = q.answer
-            self.question['hints'] = self.generate_hints(self.question['answer'], self.num_hints)
+            self.question['hints'] = self.generate_hints(self.question['answer'])
 
     @staticmethod
     def random_question():
 
+        db.connect()
         q = Question_db.select().where(Question_db.active).order_by(fn.Rand()).limit(1).get()
+        db.close()
 
         return q
 
     @staticmethod
-    def generate_hints(answer, num_hints):
+    def generate_hints(answer):
 
         a = answer
         l = len(a)
