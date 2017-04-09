@@ -1,6 +1,5 @@
 import configparser
 
-from time import sleep
 from datetime import datetime
 
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, Job
@@ -9,7 +8,12 @@ from question import *
 from player import *
 from db import db, QuestionHistory, Round
 
-# TODO: Logging
+import logging
+
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                    level=logging.INFO)
+
+# logging.basicConfig(filename='example.log',level=logging.DEBUG)
 
 config = configparser.ConfigParser()
 config.read('config/trivia.ini')
@@ -17,13 +21,15 @@ config.read('config/trivia.ini')
 
 class Trivia:
 
-    def __init__(self):
+    def __init__(self, profile='DEFAULT'):
 
-        self.updater = Updater(token=config['DEFAULT']['bot_token'])
+        self.profile = profile
+
+        self.updater = Updater(token=config[self.profile]['bot_token'])
         self.bot = self.updater.bot
         self.dispatcher = self.updater.dispatcher
         self.job_queue = self.updater.job_queue
-        self.chat_id = config['DEFAULT']['trivia_chat']
+        self.chat_id = config[self.profile]['trivia_chat']
         self.active = False
         self.question = None
         self.current_answer = None
@@ -31,8 +37,8 @@ class Trivia:
         self.correct = False
         self.round = None
 
-        self.start_webhook()
-        self.bot.sendMessage(chat_id=self.chat_id, text="Trivia instance ready.")
+        self.webhook = int(config[self.profile]['webhook'])
+        self.prepare()
 
     def create_start_handler(self):
 
@@ -42,9 +48,11 @@ class Trivia:
                 bot.sendMessage(chat_id=update.message.chat_id, text="Trivia is already running!")
             else:
                 self.round = Round()
+
                 db.connect()
                 self.round.save()
                 db.close()
+
                 bot.sendMessage(chat_id=update.message.chat_id, text="Trivia will start in ...")
 
                 sleep(1)
@@ -72,9 +80,11 @@ class Trivia:
 
             if self.active:
                 self.round.ended = datetime.now()
+
                 db.connect()
                 self.round.save()
                 db.close()
+
                 bot.sendMessage(chat_id=update.message.chat_id, text="Trivia will end after this round.")
                 self.active = False
             else:
@@ -112,23 +122,52 @@ class Trivia:
         answer_handler = MessageHandler(Filters.text, answer)
         self.dispatcher.add_handler(answer_handler)
 
-    def start_webhook(self):
+    def create_stats_handler(self):
+
+        def stats(bot, update):
+
+            message = "Current all-time stats:\n"
+
+            db.connect()
+
+            for pdb in Player_db.select().order_by(Player_db.total_score.desc()):
+
+                # Would need tg instance here, how?
+
+                # message_row = '{:<10} :: {:>10} points\n'.format(str("Player " + pdb.id), str(pdb.total_score))
+                message_row = 'Player ' + str(pdb.id) + ' :: ' + str(pdb.total_score) + ' points'
+                message += message_row
+
+            db.close()
+
+            bot.sendMessage(chat_id=update.message.chat_id, text=message)
+
+        stats_handler = CommandHandler('stats', stats)
+        self.dispatcher.add_handler(stats_handler)
+
+    def prepare(self):
 
         # Create handlers
         self.create_start_handler()
         self.create_stop_handler()
         self.create_answer_handler()
+        self.create_stats_handler()
 
-        # Start updater
-        # self.updater.start_polling()
+        # Start webhook or poller
 
-        # Start webhook
-        self.updater.start_webhook(listen='0.0.0.0',
-                                   port=8443,
-                                   url_path='TOKEN',
-                                   key='server.key',
-                                   cert='server.pem',
-                                   webhook_url=config['DEFAULT']['webhook_address'])
+        if self.webhook:
+            print("Webhook enabled. Initializing ...")
+            self.updater.start_webhook(listen='0.0.0.0',
+                                       port=8443,
+                                       url_path='TOKEN',
+                                       key='server.key',
+                                       cert='server.pem',
+                                       webhook_url=config['DEFAULT']['webhook_address'])
+        else:
+            print("Starting poller ...")
+            self.updater.start_polling()
+
+        self.bot.sendMessage(chat_id=self.chat_id, text="Trivia instance ready.")
 
     def ask_question(self):
         q = Question()
@@ -192,4 +231,5 @@ class Trivia:
         # TODO: Store status to db, show statistics, etc.
         print("End game.")
 
-Trivia()
+if __name__ == '__main__':
+    Trivia()

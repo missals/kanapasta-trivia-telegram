@@ -7,8 +7,11 @@ from peewee import *
 config = configparser.ConfigParser()
 config.read('config/db.ini')
 
+# db = pw.MySQLDatabase(config['DEFAULT']['db'], host='localhost', port=3306, user=config['DEFAULT']['user'],
+#                      password=config['DEFAULT']['password'], unix_socket='/run/mysqld/mysqld.sock')
+
 db = pw.MySQLDatabase(config['DEFAULT']['db'], host='localhost', port=3306, user=config['DEFAULT']['user'],
-                      password=config['DEFAULT']['password'], unix_socket='/run/mysqld/mysqld.sock')
+                      password=config['DEFAULT']['password'])
 
 
 class MySQLModel(Model):
@@ -79,7 +82,7 @@ def test_values():
 
 
 # Create the tables.
-db.create_tables([Player, Event, Question, QuestionHistory, Round], safe=True)
+# db.create_tables([Player, Event, Question, QuestionHistory, Round], safe=True)
 
 # Run test values
 # test_values()

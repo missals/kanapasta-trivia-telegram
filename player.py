@@ -15,7 +15,8 @@ class Player:
         if created:
             sleep(2)
             print("Created new player " + self.get_player_name())
-            bot.sendMessage(chat_id=chat_id, text="Registered new player " + self.get_player_name() + ', welcome!')
+            bot.sendMessage(chat_id=chat_id,
+                            text="Registered new player " + self.get_player_name() + ', welcome!')
 
     def get_player_name(self):
         if self.tgi['username'] != '':
