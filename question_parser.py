@@ -1,6 +1,6 @@
 import os
 
-from db import db, Question
+from classes import db, Question
 
 DIRECTORY = 'raw_questions/'
 
@@ -31,6 +31,7 @@ for file in files:
             i += 1
 
 print(j)
+print(questions[0])
 
 # Save questions to db
 with db.atomic():

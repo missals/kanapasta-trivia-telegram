@@ -1,5 +1,6 @@
 import configparser
-import datetime
+
+from datetime import datetime
 
 import peewee as pw
 from peewee import *
@@ -7,11 +8,13 @@ from peewee import *
 config = configparser.ConfigParser()
 config.read('config/db.ini')
 
-# db = pw.MySQLDatabase(config['DEFAULT']['db'], host='localhost', port=3306, user=config['DEFAULT']['user'],
-#                      password=config['DEFAULT']['password'], unix_socket='/run/mysqld/mysqld.sock')
+socket = None
+
+if int(config['DEFAULT']['use_socket']):
+    socket = '/run/mysqld/mysqld.sock'
 
 db = pw.MySQLDatabase(config['DEFAULT']['db'], host='localhost', port=3306, user=config['DEFAULT']['user'],
-                      password=config['DEFAULT']['password'])
+                      password=config['DEFAULT']['password'], unix_socket=socket)
 
 
 class MySQLModel(Model):
@@ -22,19 +25,46 @@ class MySQLModel(Model):
 class Player(MySQLModel):
     id = PrimaryKeyField(unique=True)
     tg_id = IntegerField(unique=True)
-    created = DateTimeField(default=datetime.datetime.now)
+    username = CharField(null=True)
+    first_name = CharField(null=True)
+    last_name = CharField(null=True)
+    created = DateTimeField(default=datetime.now)
     questions_attempted = IntegerField(default=0)
     questions_correct = IntegerField(default=0)
     total_score = BigIntegerField(default=0)
 
+    def name(self):
+        if self.username:
+            return self.username
+        else:
+            return self.first_name
+
+    def check_info(self, tg_player):
+
+        changes = False
+
+        if not self.username and tg_player['username'] != '':
+            self.username = tg_player['username']
+            changes = True
+        if not self.first_name and tg_player['first_name'] != '':
+            self.first_name = tg_player['first_name']
+            changes = True
+        if not self.last_name and tg_player['last_name'] != '':
+            self.last_name = tg_player['last_name']
+            changes = True
+
+        if changes:
+            self.save()
+
 
 class Question(MySQLModel):
+
     id = PrimaryKeyField(unique=True)
     question = TextField()
-    created = DateTimeField(default=datetime.datetime.now)
+    created = DateTimeField(default=datetime.now)
     answer = TextField()
     answer_type = IntegerField(default=0)
-    question_group = CharField(null=True)
+    group = CharField(null=True)
     active = BooleanField(default=True)
 
 
@@ -44,7 +74,7 @@ class QuestionHistory(MySQLModel):
     hint_1 = CharField(null=True)
     hint_2 = CharField(null=True)
     hint_3 = CharField(null=True)
-    created = DateTimeField(default=datetime.datetime.now)
+    created = DateTimeField(default=datetime.now)
     winner = ForeignKeyField(Player, related_name='winners', null=True)
     score_change = IntegerField(null=True)
 
@@ -60,7 +90,7 @@ class Event(MySQLModel):
 
 class Round(MySQLModel):
     id = PrimaryKeyField(unique=True)
-    started = DateTimeField(default=datetime.datetime.now)
+    started = DateTimeField(default=datetime.now)
     ended = DateTimeField(null=True)
 
 
@@ -83,6 +113,6 @@ def test_values():
 
 # Create the tables.
 # db.create_tables([Player, Event, Question, QuestionHistory, Round], safe=True)
-
+db.drop
 # Run test values
 # test_values()

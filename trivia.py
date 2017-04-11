@@ -1,12 +1,9 @@
-import configparser
-
-from datetime import datetime
+from time import sleep
+from random import randint
 
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, Job
 
-from question import *
-from player import *
-from db import db, QuestionHistory, Round
+from classes import *
 
 import logging
 
@@ -33,6 +30,7 @@ class Trivia:
         self.active = False
         self.question = None
         self.current_answer = None
+        self.players_with_attempts = None
         self.points = None
         self.correct = False
         self.round = None
@@ -96,28 +94,43 @@ class Trivia:
     def create_answer_handler(self):
 
         def answer(bot, update):
+
             if self.current_answer:
                 message = update.message.text
+                tg_player = update.message.from_user
+
+                db.connect()
+
+                player, created = Player.get_or_create(tg_id=tg_player['id'])
+                player.check_info(tg_player)
+
+                if created:
+                    bot.sendMessage(chat_id=self.chat_id,
+                                    text="Registered new player {}, welcome!".format(player.name()))
+
+                self.players_with_attempts.append(player)
 
                 if (message.lower() == self.current_answer.lower()) and (not self.correct):
                     self.correct = True
 
-                    p = Player(update.message.from_user, bot, self.chat_id)
-
-                    p.player.total_score += self.points
-                    self.question.winner = p.player
+                    player.total_score += self.points
+                    player.questions_correct += 1
+                    self.question.winner = player
                     self.question.score_change = self.points
 
-                    db.connect()
-                    p.player.save()
+                    player.save()
                     self.question.save()
-                    db.close()
+
+                    for player in self.players_with_attempts:
+                        player.questions_attempted += 1
+                        player.save()
 
                     bot.sendMessage(chat_id=update.message.chat_id,
-                                    text=p.get_player_name() + " got it! "
-                                    + str(self.points) + " points have been added.")
+                                    text="{} got it! {} points have been added.".format(player.name(), self.points))
 
-                    # Some highlights from the round?
+                    # TODO: Some highlights from the round?
+
+                db.close()
 
         answer_handler = MessageHandler(Filters.text, answer)
         self.dispatcher.add_handler(answer_handler)
@@ -126,16 +139,30 @@ class Trivia:
 
         def stats(bot, update):
 
-            message = "Current all-time stats:\n"
-
             db.connect()
 
-            for pdb in Player_db.select().order_by(Player_db.total_score.desc()):
+            message = "Questions attempted\n"
+            for player in Player.select().order_by(Player.questions_attempted.desc()):
+                name = player.name()
+                score = player.questions_attempted
 
-                # Would need tg instance here, how?
+                message_row = "{}: {}\n".format(name, score)
+                message += message_row
 
-                # message_row = '{:<10} :: {:>10} points\n'.format(str("Player " + pdb.id), str(pdb.total_score))
-                message_row = 'Player ' + str(pdb.id) + ' :: ' + str(pdb.total_score) + ' points'
+            message += "\nQuestions correct\n"
+            for player in Player.select().order_by(Player.questions_correct.desc()):
+                name = player.name()
+                score = player.questions_correct
+
+                message_row = "{}: {}\n".format(name, score)
+                message += message_row
+
+            message += "\nTotal score\n"
+            for player in Player.select().order_by(Player.total_score.desc()):
+                name = player.name()
+                score = player.total_score
+
+                message_row = "{}: {}\n".format(name, score)
                 message += message_row
 
             db.close()
@@ -145,6 +172,20 @@ class Trivia:
         stats_handler = CommandHandler('stats', stats)
         self.dispatcher.add_handler(stats_handler)
 
+    def create_whoami_handler(self):
+
+        def whoami(bot, update):
+            tg_player = update.message.from_user
+
+            print("ID:\t\t\t\t{}".format(tg_player.id))
+            print("Username:\t\t{}".format(tg_player.username))
+            print("First name:\t\t{}".format(tg_player.first_name))
+            print("Last name:\t\t{}".format(tg_player.last_name))
+            # print("Type:\t\t{}".format(tg_player.type))
+
+        whoami_handler = CommandHandler('whoami', whoami)
+        self.dispatcher.add_handler(whoami_handler)
+
     def prepare(self):
 
         # Create handlers
@@ -152,6 +193,7 @@ class Trivia:
         self.create_stop_handler()
         self.create_answer_handler()
         self.create_stats_handler()
+        self.create_whoami_handler()
 
         # Start webhook or poller
 
@@ -169,17 +211,107 @@ class Trivia:
 
         self.bot.sendMessage(chat_id=self.chat_id, text="Trivia instance ready.")
 
+    @staticmethod
+    def get_a_random_question():
+
+        db.connect()
+        q = Question.select().where(Question.active).order_by(fn.Rand()).limit(1).get()
+        db.close()
+
+        return q
+
+    @staticmethod
+    def generate_hints(answer):
+
+        a = answer
+        l = len(a)
+
+        if l == 1:
+            return ['*']
+
+        elif l == 2:
+
+            h = ['**']
+            if randint(0, 1) == 0:
+                h.append('*' + a[1])
+            else:
+                h.append(a[0] + '*')
+
+            return h
+
+        elif 3 <= l <= 5:
+            hints = list()
+            hint = list()
+
+            for i in range(l):
+                if a[i] != ' ':
+                    hint.append('*')
+                else:
+                    hint.append(' ')
+
+            hints.append("".join(hint))
+
+            hint = list()
+
+            for i in range(l):
+                if (randint(0, 2) == 0) or a[i] == ' ':
+                    hint.append(a[i])
+                else:
+                    hint.append('*')
+
+            hints.append("".join(hint))
+
+            return hints
+
+        else:
+            hints = list()
+
+            hint = list()
+
+            for i in range(l):
+                if a[i] != ' ':
+                    hint.append('*')
+                else:
+                    hint.append(' ')
+
+            hints.append("".join(hint))
+
+            hint = list()
+
+            for i in range(l):
+                if (randint(0, 1) == 0) or a[i] == ' ':
+                    hint.append(a[i])
+                else:
+                    hint.append('*')
+
+            hints.append("".join(hint))
+
+            hint_comp = hint
+            hint = list()
+
+            for i in range(l):
+                if (randint(0, 1) == 0) or a[i] == ' ' or hint_comp[i] != '*':
+                    hint.append(a[i])
+                else:
+                    hint.append('*')
+
+            hints.append("".join(hint))
+
+            return hints
+
     def ask_question(self):
-        q = Question()
+
+        question = self.get_a_random_question()
+        hints = self.generate_hints(question.answer)
 
         qh = QuestionHistory()
-        qh.question = q.question_db
+        qh.question = question
 
         self.question = qh
 
         i = 1
 
-        for hint in q.question['hints']:
+        for hint in hints:
             if i == 1:
                 qh.hint_1 = hint
             elif i == 2:
@@ -195,15 +327,16 @@ class Trivia:
 
         self.correct = False
         self.points = 10
-        self.current_answer = q.question['answer']
+        self.current_answer = question.answer
+        self.players_with_attempts = []
 
         self.bot.sendMessage(chat_id=self.chat_id, text="Question #" +
-                                                        str(q.question['qid']) +
-                                                        " :: " + q.question['question'] + " :: "
+                                                        str(question.id) +
+                                                        " :: " + question.question + " :: "
                                                         + str(self.points) + " points")
         sleep(10)
 
-        for hint in q.question['hints']:
+        for hint in hints:
             if not self.correct:
                 self.points -= 2
                 self.bot.sendMessage(chat_id=self.chat_id, text="Hint :: " + hint + " :: "
@@ -214,7 +347,13 @@ class Trivia:
             self.current_answer = None
             self.correct = False
             self.bot.sendMessage(chat_id=self.chat_id, text="No-one got it! The correct answer was " +
-                                                            q.question['answer'])
+                                                            question.answer)
+
+            db.connect()
+            for player in self.players_with_attempts:
+                player.questions_attempted += 1
+                player.save()
+            db.close()
 
         sleep(10)
 
