@@ -1,6 +1,6 @@
 import os
 
-from classes import db, Question
+from models import db, Question
 
 DIRECTORY = 'raw_questions/'
 

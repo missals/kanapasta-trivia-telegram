@@ -113,6 +113,6 @@ def test_values():
 
 # Create the tables.
 # db.create_tables([Player, Event, Question, QuestionHistory, Round], safe=True)
-db.drop
+
 # Run test values
 # test_values()

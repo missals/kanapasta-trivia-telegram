@@ -3,7 +3,7 @@ from random import randint
 
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, Job
 
-from classes import *
+from models import *
 
 import logging
 
@@ -369,6 +369,7 @@ class Trivia:
 
         # TODO: Store status to db, show statistics, etc.
         print("End game.")
+
 
 if __name__ == '__main__':
     Trivia()
