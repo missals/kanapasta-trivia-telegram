@@ -67,7 +67,7 @@ class Trivia:
                 def play_game(bot, job):
                     self.play()
 
-                self.job_queue.put(Job(play_game, 0, repeat=False))
+                self.job_queue.run_once(play_game, 0)
 
         start_handler = CommandHandler('start', start)
         self.dispatcher.add_handler(start_handler)
@@ -207,7 +207,7 @@ class Trivia:
                                        webhook_url=config['DEFAULT']['webhook_address'])
         else:
             print("Starting poller ...")
-            self.updater.start_polling()
+            self.updater.start_polling(timeout=30)
 
         self.bot.sendMessage(chat_id=self.chat_id, text="Trivia instance ready.")
 
