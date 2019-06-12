@@ -126,7 +126,8 @@ class Trivia:
                         player.save()
 
                     bot.sendMessage(chat_id=update.message.chat_id,
-                                    text="{} got it! {} points have been added.".format(player.name(), self.points))
+                                    text="{} got it! {} points have been added. The correct answer was {}.".format(
+                                        player.name(), self.points, self.current_answer))
 
                     # TODO: Some highlights from the round?
 
