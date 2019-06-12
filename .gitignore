@@ -5,3 +5,4 @@ __pycache__/
 config/
 raw_questions/
 *.pyc
+*.log

@@ -8,7 +8,7 @@ from models import *
 import logging
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                    level=logging.INFO)
+                    level=logging.INFO, filename='trivia.log')
 
 # logging.basicConfig(filename='example.log',level=logging.DEBUG)
 
